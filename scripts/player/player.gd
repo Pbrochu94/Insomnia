@@ -4,7 +4,7 @@ extends CharacterBody2D
 ##
 ## Ce script contient les réglages et les « outils » de mouvement (gravité,
 ## déplacement, saut, crouch). C'est la state machine (nœud StateMachine) qui
-## décide lesquels utiliser selon l'état actuel : Idle, Walk, Run, Jump, Fall, Crouch.
+## décide lesquels utiliser selon l'état actuel : Idle, Walk, Run, Jump, Fall, Crouch, Slide.
 ##
 ## Structure attendue :
 ##   Player (CharacterBody2D, origine aux pieds)
@@ -12,7 +12,7 @@ extends CharacterBody2D
 ##   ├── Visual            (Node2D optionnel : Sprite2D, Polygon2D, etc.)
 ##   ├── StateLabel        (Label optionnel : affiche l'état actuel, pour debug)
 ##   └── StateMachine      (PlayerStateMachine)
-##       ├── Idle, Walk, Run, Jump, Fall, Crouch  (PlayerState)
+##       ├── Idle, Walk, Run, Jump, Fall, Crouch, Slide  (PlayerState)
 
 @export_group("Capacités")
 ## Peut se déplacer à gauche/droite. Désactivé : le personnage freine et reste sur place.
@@ -20,6 +20,12 @@ extends CharacterBody2D
 @export var can_sprint: bool = true
 @export var can_jump: bool = true
 @export var can_crouch: bool = true
+## Glissade (crouch pendant un sprint). Verrouillée au départ : se débloque
+## en cours de partie avec unlock_slide(). Coche-la ici pour tester.
+@export var slide_unlocked: bool = false
+## Glissade permise en ce moment (ex. : désactivée sur certains types de sol,
+## zones, cinématiques). Ne sert que si slide_unlocked est vrai.
+@export var can_slide: bool = true
 
 @export_group("Déplacement")
 @export var walk_speed: float = 200.0
@@ -45,12 +51,29 @@ extends CharacterBody2D
 @export_group("Crouch")
 @export_range(0.2, 1.0) var crouch_height_ratio: float = 0.5
 
+@export_group("Slide")
+## Vitesse au début de la glissade (la vitesse actuelle est gardée si elle est plus grande).
+@export var slide_speed: float = 480.0
+## Durée max (s) de la glissade.
+@export var slide_duration: float = 0.45
+## Ralentissement pendant la glissade (pixels/s²).
+@export var slide_friction: float = 600.0
+## Temps (s) avant de pouvoir glisser à nouveau.
+@export var slide_cooldown: float = 0.3
+## Vitesse horizontale ajoutée quand on saute pendant une glissade (saute plus loin).
+@export var slide_jump_boost: float = 50.0
+
 var facing: int = 1
 var is_crouching: bool = false
 var is_sprinting: bool = false
+var is_sliding: bool = false
+## Vitesse max dans les airs gagnée par un saut depuis une glissade.
+## Remise à 0 à l'atterrissage ou si on change de direction.
+var air_momentum: float = 0.0
 
 var _coyote_timer: float = 0.0
 var _jump_buffer_timer: float = 0.0
+var _slide_cooldown_timer: float = 0.0
 var _body_shape: RectangleShape2D
 var _standing_height: float
 var _standing_shape_y: float
@@ -79,7 +102,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	var direction := get_input_direction()
-	if direction != 0.0:
+	# Pendant une glissade, la direction est verrouillée.
+	if direction != 0.0 and not is_sliding:
 		facing = int(signf(direction))
 	_update_visual()
 
@@ -94,6 +118,9 @@ func _update_timers(delta: float) -> void:
 		_jump_buffer_timer = jump_buffer_time
 	else:
 		_jump_buffer_timer -= delta
+
+	if not is_sliding:
+		_slide_cooldown_timer -= delta
 
 
 func _on_state_changed(_from: StringName, to: StringName) -> void:
@@ -113,6 +140,12 @@ func wants_sprint() -> bool:
 
 func wants_crouch() -> bool:
 	return can_crouch and Input.is_action_pressed("crouch")
+
+
+## Vrai si on vient d'appuyer sur crouch, au sol, et que le cooldown est terminé.
+## (Vérifié seulement depuis l'état Run.)
+func wants_slide() -> bool:
+	return slide_unlocked and can_slide and is_on_floor() and _slide_cooldown_timer <= 0.0 and Input.is_action_just_pressed("crouch")
 
 
 ## Vrai si on a appuyé sur saut récemment ET qu'on peut sauter
@@ -167,6 +200,28 @@ func set_crouching(value: bool) -> void:
 	_collision.position.y = _standing_shape_y + (_standing_height - h) * 0.5
 
 
+func start_slide() -> void:
+	is_sliding = true
+	set_crouching(true)
+
+
+## Débloque la glissade (à appeler depuis un objet, un événement, etc.).
+func unlock_slide() -> void:
+	slide_unlocked = true
+
+
+## Saut depuis une glissade : bonus de vitesse, conservé jusqu'à l'atterrissage.
+func apply_slide_jump_boost() -> void:
+	velocity.x = facing * (absf(velocity.x) + slide_jump_boost)
+	air_momentum = absf(velocity.x)
+
+
+func end_slide() -> void:
+	is_sliding = false
+	set_crouching(false)
+	_slide_cooldown_timer = slide_cooldown
+
+
 ## Vérifie s'il y a assez de place au-dessus pour se relever.
 func can_stand() -> bool:
 	if not is_crouching:
@@ -186,7 +241,7 @@ func can_stand() -> bool:
 
 ## Placeholder : retourne le visuel selon la direction et l'écrase en crouch.
 ## À remplacer par tes animations plus tard (state_machine.get_current_state_name()
-## donne l'animation à jouer : "Idle", "Walk", "Run", "Jump", "Fall", "Crouch").
+## donne l'animation à jouer : "Idle", "Walk", "Run", "Jump", "Fall", "Crouch", "Slide").
 func _update_visual() -> void:
 	if _visual == null:
 		return

@@ -11,6 +11,7 @@ const RUN := &"Run"
 const JUMP := &"Jump"
 const FALL := &"Fall"
 const CROUCH := &"Crouch"
+const SLIDE := &"Slide"
 
 var player: Player
 var state_machine: PlayerStateMachine
@@ -61,6 +62,14 @@ func try_ground_transitions() -> bool:
 	return false
 
 
-## Vitesse max dans les airs : on garde le sprint si Shift est tenu.
+## Vitesse max dans les airs : on garde le sprint si Shift est tenu,
+## et l'élan d'un saut depuis une glissade tant qu'on va dans la même direction.
 func air_speed() -> float:
-	return player.sprint_speed if player.wants_sprint() else player.walk_speed
+	var speed := player.sprint_speed if player.wants_sprint() else player.walk_speed
+	if player.air_momentum > 0.0:
+		var direction := player.get_input_direction()
+		if direction != 0.0 and signf(direction) != signf(player.velocity.x):
+			player.air_momentum = 0.0  # Changement de direction : on perd l'élan.
+		else:
+			speed = maxf(speed, player.air_momentum)
+	return speed

@@ -6,6 +6,29 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
+## [Non commité] · branche `base-player-movement`
+
+### Ajouté
+- **Slide** : appuyer sur crouch pendant un sprint (état `Run`) déclenche une glissade.
+  - Nouvel état `Slide` (`scripts/player/states/slide.gd`, nœud `Slide` sous `StateMachine`).
+  - Hitbox accroupie, élan vers l'avant (`slide_speed`, ou la vitesse actuelle si plus grande) qui ralentit (`slide_friction`).
+  - Direction verrouillée pendant la glissade.
+  - **Saut depuis une glissade** : on saute plus loin. Bonus de vitesse `slide_jump_boost` (50), et l'élan est conservé dans les airs jusqu'à l'atterrissage (`air_momentum`). Changer de direction en l'air annule l'élan.
+  - Fin après `slide_duration` ou quand la vitesse tombe sous `crouch_speed` → `Crouch` si crouch est toujours tenu (ou sous un plafond), sinon l'état au sol normal.
+  - Cooldown (`slide_cooldown`) avant de pouvoir glisser à nouveau.
+- `slide_unlocked` (groupe Capacités) : **désactivé par défaut**, la glissade se débloque en cours de partie avec `unlock_slide()`. À cocher dans l'inspecteur pour tester.
+- `can_slide` (groupe Capacités, activé par défaut) : glissade permise ou non **en ce moment** (ex. : certains types de sol, zones). Il faut `slide_unlocked` **et** `can_slide` pour glisser.
+- Réglages dans l'inspecteur : groupe **Slide** (`slide_speed`, `slide_duration`, `slide_friction`, `slide_cooldown`, `slide_jump_boost`).
+- Fichiers `.gd.uid` générés par Godot pour les scripts de la state machine et des états.
+
+### Modifié
+- `Run` : vérifie la glissade avant les transitions au sol.
+- `air_speed()` (utilisé par `Jump` et `Fall`) tient compte de l'élan d'un saut depuis une glissade ; `Fall` le remet à 0 à l'atterrissage.
+- `player.tscn` : UID ajoutés par Godot sur les scripts et nœuds ; valeurs du slide ajustées dans l'inspecteur (`slide_speed` 440, `slide_duration` 0.65, `slide_friction` 400).
+- `project.godot` : action `crouch` définie dans les Contrôles du projet → **Alt**, **Flèche bas**, **Croix directionnelle bas** (manette).
+
+---
+
 ## 2026-11-20 · commit `edd401f` · branche `player-state-machine`
 
 ### Ajouté

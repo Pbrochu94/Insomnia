@@ -10,4 +10,5 @@ func physics_update(delta: float) -> void:
 	if player.wants_jump():
 		go(JUMP)
 	elif player.is_on_floor():
+		player.air_momentum = 0.0
 		go(ground_state())

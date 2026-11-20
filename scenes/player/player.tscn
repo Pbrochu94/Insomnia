@@ -1,19 +1,23 @@
 [gd_scene format=3 uid="uid://b2kj40qq1niph"]
 
 [ext_resource type="Script" uid="uid://bciunei5k4gf0" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="Script" path="res://scripts/player/state_machine/player_state_machine.gd" id="2_sm"]
-[ext_resource type="Script" path="res://scripts/player/states/idle.gd" id="3_idle"]
-[ext_resource type="Script" path="res://scripts/player/states/walk.gd" id="4_walk"]
-[ext_resource type="Script" path="res://scripts/player/states/run.gd" id="5_run"]
-[ext_resource type="Script" path="res://scripts/player/states/jump.gd" id="6_jump"]
-[ext_resource type="Script" path="res://scripts/player/states/fall.gd" id="7_fall"]
-[ext_resource type="Script" path="res://scripts/player/states/crouch.gd" id="8_crouch"]
+[ext_resource type="Script" uid="uid://cl8jx4vgbqid7" path="res://scripts/player/state_machine/player_state_machine.gd" id="2_sm"]
+[ext_resource type="Script" uid="uid://d0kh26ydb58gu" path="res://scripts/player/states/idle.gd" id="3_idle"]
+[ext_resource type="Script" uid="uid://cbhna627g6osy" path="res://scripts/player/states/walk.gd" id="4_walk"]
+[ext_resource type="Script" uid="uid://c1xrktmbmsjsm" path="res://scripts/player/states/run.gd" id="5_run"]
+[ext_resource type="Script" uid="uid://bj3eva35lds38" path="res://scripts/player/states/jump.gd" id="6_jump"]
+[ext_resource type="Script" uid="uid://ccgphqppp7yjw" path="res://scripts/player/states/fall.gd" id="7_fall"]
+[ext_resource type="Script" uid="uid://bkm20w74sokje" path="res://scripts/player/states/crouch.gd" id="8_crouch"]
+[ext_resource type="Script" uid="uid://cuw21uej0tvr3" path="res://scripts/player/states/slide.gd" id="9_slide"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(24, 48)
 
 [node name="Player" type="CharacterBody2D" unique_id=82201268]
 script = ExtResource("1_player")
+slide_speed = 440.0
+slide_duration = 0.65
+slide_friction = 400.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1264546626]
 position = Vector2(0, -24)
@@ -23,7 +27,7 @@ shape = SubResource("RectangleShape2D_body")
 color = Color(0.35, 0.6, 1, 1)
 polygon = PackedVector2Array(-12, -48, 12, -48, 12, 0, -12, 0)
 
-[node name="StateLabel" type="Label" parent="."]
+[node name="StateLabel" type="Label" parent="." unique_id=1786559341]
 offset_left = -50.0
 offset_top = -78.0
 offset_right = 50.0
@@ -35,24 +39,27 @@ horizontal_alignment = 1
 position = Vector2(0, -60)
 position_smoothing_enabled = true
 
-[node name="StateMachine" type="Node" parent="." node_paths=PackedStringArray("initial_state")]
+[node name="StateMachine" type="Node" parent="." unique_id=413743342 node_paths=PackedStringArray("initial_state")]
 script = ExtResource("2_sm")
 initial_state = NodePath("Idle")
 
-[node name="Idle" type="Node" parent="StateMachine"]
+[node name="Idle" type="Node" parent="StateMachine" unique_id=1672159386]
 script = ExtResource("3_idle")
 
-[node name="Walk" type="Node" parent="StateMachine"]
+[node name="Walk" type="Node" parent="StateMachine" unique_id=1319881444]
 script = ExtResource("4_walk")
 
-[node name="Run" type="Node" parent="StateMachine"]
+[node name="Run" type="Node" parent="StateMachine" unique_id=669974426]
 script = ExtResource("5_run")
 
-[node name="Jump" type="Node" parent="StateMachine"]
+[node name="Jump" type="Node" parent="StateMachine" unique_id=1951658274]
 script = ExtResource("6_jump")
 
-[node name="Fall" type="Node" parent="StateMachine"]
+[node name="Fall" type="Node" parent="StateMachine" unique_id=971437982]
 script = ExtResource("7_fall")
 
-[node name="Crouch" type="Node" parent="StateMachine"]
+[node name="Crouch" type="Node" parent="StateMachine" unique_id=621618658]
 script = ExtResource("8_crouch")
+
+[node name="Slide" type="Node" parent="StateMachine" unique_id=24868158]
+script = ExtResource("9_slide")
