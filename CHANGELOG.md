@@ -6,7 +6,7 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
-## [Non commité] · branche `base-player-movement`
+## 2026-11-20 · commit `c1dce18` · branche `base-player-movement`
 
 ### Ajouté
 - **Slide** : appuyer sur crouch pendant un sprint (état `Run`) déclenche une glissade.
