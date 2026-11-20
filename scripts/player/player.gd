@@ -1,13 +1,18 @@
 class_name Player
 extends CharacterBody2D
-## Contrôleur de base pour le personnage principal d'un side-scroller.
-## Gère : marche gauche/droite, sprint, saut (hauteur variable, coyote time,
-## jump buffer) et crouch (hitbox réduite, impossible de se relever sous un plafond).
+## Personnage principal d'un side-scroller.
+##
+## Ce script contient les réglages et les « outils » de mouvement (gravité,
+## déplacement, saut, crouch). C'est la state machine (nœud StateMachine) qui
+## décide lesquels utiliser selon l'état actuel : Idle, Walk, Run, Jump, Fall, Crouch.
 ##
 ## Structure attendue :
 ##   Player (CharacterBody2D, origine aux pieds)
 ##   ├── CollisionShape2D  (RectangleShape2D)
-##   └── Visual (Node2D optionnel : Sprite2D, Polygon2D, etc.)
+##   ├── Visual            (Node2D optionnel : Sprite2D, Polygon2D, etc.)
+##   ├── StateLabel        (Label optionnel : affiche l'état actuel, pour debug)
+##   └── StateMachine      (PlayerStateMachine)
+##       ├── Idle, Walk, Run, Jump, Fall, Crouch  (PlayerState)
 
 @export_group("Capacités")
 ## Peut se déplacer à gauche/droite. Désactivé : le personnage freine et reste sur place.
@@ -50,8 +55,10 @@ var _body_shape: RectangleShape2D
 var _standing_height: float
 var _standing_shape_y: float
 
+@onready var state_machine: PlayerStateMachine = $StateMachine
 @onready var _collision: CollisionShape2D = $CollisionShape2D
 @onready var _visual: Node2D = get_node_or_null("Visual")
+@onready var _state_label: Label = get_node_or_null("StateLabel")
 
 
 func _ready() -> void:
@@ -62,17 +69,16 @@ func _ready() -> void:
 	_standing_height = _body_shape.size.y
 	_standing_shape_y = _collision.position.y
 
+	state_machine.state_changed.connect(_on_state_changed)
+	state_machine.init(self)
+
 
 func _physics_process(delta: float) -> void:
-	var direction := Input.get_axis("move_left", "move_right") if can_move else 0.0
-
 	_update_timers(delta)
-	_update_crouch()
-	_apply_gravity(delta)
-	_handle_jump()
-	_handle_horizontal(direction, delta)
+	state_machine.physics_update(delta)
 	move_and_slide()
 
+	var direction := get_input_direction()
 	if direction != 0.0:
 		facing = int(signf(direction))
 	_update_visual()
@@ -90,7 +96,34 @@ func _update_timers(delta: float) -> void:
 		_jump_buffer_timer -= delta
 
 
-func _apply_gravity(delta: float) -> void:
+func _on_state_changed(_from: StringName, to: StringName) -> void:
+	if _state_label:
+		_state_label.text = String(to)
+
+
+# --- Lecture des inputs (utilisée par les états) --------------------------
+
+func get_input_direction() -> float:
+	return Input.get_axis("move_left", "move_right") if can_move else 0.0
+
+
+func wants_sprint() -> bool:
+	return can_sprint and get_input_direction() != 0.0 and Input.is_action_pressed("sprint")
+
+
+func wants_crouch() -> bool:
+	return can_crouch and Input.is_action_pressed("crouch")
+
+
+## Vrai si on a appuyé sur saut récemment ET qu'on peut sauter
+## (au sol ou dans le coyote time, avec la place pour se relever).
+func wants_jump() -> bool:
+	return can_jump and _jump_buffer_timer > 0.0 and _coyote_timer > 0.0 and can_stand()
+
+
+# --- Actions (utilisées par les états) ------------------------------------
+
+func apply_gravity(delta: float) -> void:
 	if is_on_floor():
 		return
 	var g := get_gravity().y
@@ -99,49 +132,32 @@ func _apply_gravity(delta: float) -> void:
 	velocity.y = minf(velocity.y + g * delta, max_fall_speed)
 
 
-func _handle_jump() -> void:
-	if not can_jump:
-		return
-	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0 and _can_stand():
-		_set_crouching(false)
-		velocity.y = -jump_velocity
-		_jump_buffer_timer = 0.0
-		_coyote_timer = 0.0
-
-	# Hauteur de saut variable : relâcher tôt = saut plus court.
-	if Input.is_action_just_released("jump") and velocity.y < 0.0:
-		velocity.y *= jump_cut_multiplier
-
-
-func _handle_horizontal(direction: float, delta: float) -> void:
-	is_sprinting = can_sprint and Input.is_action_pressed("sprint") and not is_crouching and direction != 0.0
-
-	var max_speed := walk_speed
-	if is_crouching:
-		max_speed = crouch_speed
-	elif is_sprinting:
-		max_speed = sprint_speed
-
+## Accélère vers la direction des inputs (ou freine si aucune), jusqu'à max_speed.
+func move_horizontal(max_speed: float, delta: float) -> void:
+	var direction := get_input_direction()
 	var on_floor := is_on_floor()
 	var rate: float
 	if direction != 0.0:
 		rate = ground_acceleration if on_floor else air_acceleration
 	else:
 		rate = ground_friction if on_floor else air_friction
-
 	velocity.x = move_toward(velocity.x, direction * max_speed, rate * delta)
 
 
-# --- Crouch ---------------------------------------------------------------
-
-func _update_crouch() -> void:
-	if can_crouch and Input.is_action_pressed("crouch") and is_on_floor():
-		_set_crouching(true)
-	elif is_crouching and _can_stand():
-		_set_crouching(false)
+func jump() -> void:
+	set_crouching(false)
+	velocity.y = -jump_velocity
+	_jump_buffer_timer = 0.0
+	_coyote_timer = 0.0
 
 
-func _set_crouching(value: bool) -> void:
+## Coupe le saut quand on relâche le bouton pendant la montée.
+func cut_jump() -> void:
+	if velocity.y < 0.0:
+		velocity.y *= jump_cut_multiplier
+
+
+func set_crouching(value: bool) -> void:
 	if value == is_crouching:
 		return
 	is_crouching = value
@@ -152,7 +168,7 @@ func _set_crouching(value: bool) -> void:
 
 
 ## Vérifie s'il y a assez de place au-dessus pour se relever.
-func _can_stand() -> bool:
+func can_stand() -> bool:
 	if not is_crouching:
 		return true
 	var shape := RectangleShape2D.new()
@@ -169,7 +185,8 @@ func _can_stand() -> bool:
 # --- Visuel ---------------------------------------------------------------
 
 ## Placeholder : retourne le visuel selon la direction et l'écrase en crouch.
-## À remplacer par tes animations (AnimatedSprite2D / AnimationPlayer) plus tard.
+## À remplacer par tes animations plus tard (state_machine.get_current_state_name()
+## donne l'animation à jouer : "Idle", "Walk", "Run", "Jump", "Fall", "Crouch").
 func _update_visual() -> void:
 	if _visual == null:
 		return

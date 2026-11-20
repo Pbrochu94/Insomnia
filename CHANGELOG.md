@@ -6,6 +6,30 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
+## 2026-11-20 · commit « Add player state machine » · branche `player-state-machine`
+
+### Ajouté
+- **State machine du joueur** (nœud `StateMachine` dans `player.tscn`), avec 6 états :
+
+  | État | Quand |
+  |---|---|
+  | `Idle` | Au sol, immobile |
+  | `Walk` | Au sol, en déplacement |
+  | `Run` | Au sol, en déplacement avec sprint |
+  | `Jump` | Dans les airs, en montée |
+  | `Fall` | Dans les airs, en chute (coyote time et jump buffer gérés ici) |
+  | `Crouch` | Au sol, accroupi (immobile ou en déplacement) ; reste accroupi sous un plafond |
+
+- `scripts/player/state_machine/player_state_machine.gd` : change d'état (`transition_to()`), signal `state_changed(from, to)`, `get_current_state_name()`.
+- `scripts/player/state_machine/player_state.gd` : classe de base des états (`enter`, `exit`, `physics_update`) + helpers partagés.
+- `scripts/player/states/` : un script par état.
+- `StateLabel` au-dessus du joueur qui affiche l'état actuel (debug, peut être supprimé).
+
+### Modifié
+- `player.gd` réorganisé : il garde les réglages et les « outils » (`apply_gravity`, `move_horizontal`, `jump`, `cut_jump`, `set_crouching`, `can_stand`, `wants_jump`…), et c'est l'état actif qui décide quoi utiliser. Comportement du mouvement inchangé.
+
+---
+
 ## 2026-11-20 · commit `22c4221` · branche `workflow-readme`
 
 ### Ajouté
