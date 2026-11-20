@@ -6,7 +6,7 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
-## 2026-11-20 · commit « Add player ability toggles » · branche `base-player-movement`
+## 2026-11-20 · commit `120073b` · branche `base-player-movement`
 
 ### Ajouté
 - **Player — groupe « Capacités »** dans l'inspecteur pour activer/désactiver des fonctionnalités :
