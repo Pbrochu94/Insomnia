@@ -6,6 +6,13 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
+## 2026-11-20 · commit `22c4221` · branche `workflow-readme`
+
+### Ajouté
+- `README.md` : section **Workflow** (branche par feature → push sur une branche GitHub du même nom → PR → merge manuel).
+
+---
+
 ## 2026-11-20 · commit `120073b` · branche `base-player-movement`
 
 ### Ajouté
