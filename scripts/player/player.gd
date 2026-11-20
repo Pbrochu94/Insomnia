@@ -9,6 +9,13 @@ extends CharacterBody2D
 ##   ├── CollisionShape2D  (RectangleShape2D)
 ##   └── Visual (Node2D optionnel : Sprite2D, Polygon2D, etc.)
 
+@export_group("Capacités")
+## Peut se déplacer à gauche/droite. Désactivé : le personnage freine et reste sur place.
+@export var can_move: bool = true
+@export var can_sprint: bool = true
+@export var can_jump: bool = true
+@export var can_crouch: bool = true
+
 @export_group("Déplacement")
 @export var walk_speed: float = 200.0
 @export var sprint_speed: float = 340.0
@@ -57,7 +64,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var direction := Input.get_axis("move_left", "move_right")
+	var direction := Input.get_axis("move_left", "move_right") if can_move else 0.0
 
 	_update_timers(delta)
 	_update_crouch()
@@ -93,6 +100,8 @@ func _apply_gravity(delta: float) -> void:
 
 
 func _handle_jump() -> void:
+	if not can_jump:
+		return
 	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0 and _can_stand():
 		_set_crouching(false)
 		velocity.y = -jump_velocity
@@ -105,7 +114,7 @@ func _handle_jump() -> void:
 
 
 func _handle_horizontal(direction: float, delta: float) -> void:
-	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and direction != 0.0
+	is_sprinting = can_sprint and Input.is_action_pressed("sprint") and not is_crouching and direction != 0.0
 
 	var max_speed := walk_speed
 	if is_crouching:
@@ -126,7 +135,7 @@ func _handle_horizontal(direction: float, delta: float) -> void:
 # --- Crouch ---------------------------------------------------------------
 
 func _update_crouch() -> void:
-	if Input.is_action_pressed("crouch") and is_on_floor():
+	if can_crouch and Input.is_action_pressed("crouch") and is_on_floor():
 		_set_crouching(true)
 	elif is_crouching and _can_stand():
 		_set_crouching(false)
