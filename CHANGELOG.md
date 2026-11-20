@@ -6,7 +6,7 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
-## 2026-11-20 · commit « Add player state machine » · branche `player-state-machine`
+## 2026-11-20 · commit `edd401f` · branche `player-state-machine`
 
 ### Ajouté
 - **State machine du joueur** (nœud `StateMachine` dans `player.tscn`), avec 6 états :
