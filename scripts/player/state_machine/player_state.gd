@@ -12,6 +12,8 @@ const JUMP := &"Jump"
 const FALL := &"Fall"
 const CROUCH := &"Crouch"
 const SLIDE := &"Slide"
+const WALL_SLIDE := &"WallSlide"
+const WALL_JUMP := &"WallJump"
 
 var player: Player
 var state_machine: PlayerStateMachine

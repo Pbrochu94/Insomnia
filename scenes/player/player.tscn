@@ -9,6 +9,8 @@
 [ext_resource type="Script" uid="uid://ccgphqppp7yjw" path="res://scripts/player/states/fall.gd" id="7_fall"]
 [ext_resource type="Script" uid="uid://bkm20w74sokje" path="res://scripts/player/states/crouch.gd" id="8_crouch"]
 [ext_resource type="Script" uid="uid://cuw21uej0tvr3" path="res://scripts/player/states/slide.gd" id="9_slide"]
+[ext_resource type="Script" uid="uid://dd3h0wlbe2u4y" path="res://scripts/player/states/wall_slide.gd" id="10_wall_slide"]
+[ext_resource type="Script" uid="uid://wqw2h6jul8ki" path="res://scripts/player/states/wall_jump.gd" id="11_wall_jump"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(24, 48)
@@ -63,3 +65,9 @@ script = ExtResource("8_crouch")
 
 [node name="Slide" type="Node" parent="StateMachine" unique_id=24868158]
 script = ExtResource("9_slide")
+
+[node name="WallSlide" type="Node" parent="StateMachine" unique_id=970730667]
+script = ExtResource("10_wall_slide")
+
+[node name="WallJump" type="Node" parent="StateMachine" unique_id=359468344]
+script = ExtResource("11_wall_jump")

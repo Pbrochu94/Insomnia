@@ -14,6 +14,9 @@ func physics_update(delta: float) -> void:
 	if Input.is_action_just_released("jump"):
 		player.cut_jump()
 
+	# Sauter de nouveau en touchant un mur = wall-jump.
+	if player.wants_wall_jump():
+		go(WALL_JUMP)
 	# Sommet du saut atteint (ou tête contre un plafond).
-	if player.velocity.y >= 0.0:
+	elif player.velocity.y >= 0.0:
 		go(FALL)
