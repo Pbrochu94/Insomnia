@@ -6,7 +6,7 @@ Catégories utilisées : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**.
 
 ---
 
-## [Non commité] · branche `wall-jump`
+## 2026-11-20 · commit `c5aa6e1` · branche `wall-jump`
 
 ### Ajouté
 - **Wall slide** : nouvel état `WallSlide` (`scripts/player/states/wall_slide.gd`). Dans les airs, en chute, collé à un mur **en poussant vers lui** → la chute est ralentie (`wall_slide_speed`). Lâcher la direction = chute normale.
