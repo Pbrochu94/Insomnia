@@ -4,7 +4,8 @@ extends CharacterBody2D
 ##
 ## Ce script contient les réglages et les « outils » de mouvement (gravité,
 ## déplacement, saut, crouch). C'est la state machine (nœud StateMachine) qui
-## décide lesquels utiliser selon l'état actuel : Idle, Walk, Run, Jump, Fall, Crouch, Slide.
+## décide lesquels utiliser selon l'état actuel : Idle, Walk, Run, Jump, Fall, Crouch, Slide,
+## WallSlide, WallJump.
 ##
 ## Structure attendue :
 ##   Player (CharacterBody2D, origine aux pieds)
@@ -12,7 +13,7 @@ extends CharacterBody2D
 ##   ├── Visual            (Node2D optionnel : Sprite2D, Polygon2D, etc.)
 ##   ├── StateLabel        (Label optionnel : affiche l'état actuel, pour debug)
 ##   └── StateMachine      (PlayerStateMachine)
-##       ├── Idle, Walk, Run, Jump, Fall, Crouch, Slide  (PlayerState)
+##       ├── Idle, Walk, Run, Jump, Fall, Crouch, Slide, WallSlide, WallJump  (PlayerState)
 
 @export_group("Capacités")
 ## Peut se déplacer à gauche/droite. Désactivé : le personnage freine et reste sur place.
@@ -26,6 +27,15 @@ extends CharacterBody2D
 ## Glissade permise en ce moment (ex. : désactivée sur certains types de sol,
 ## zones, cinématiques). Ne sert que si slide_unlocked est vrai.
 @export var can_slide: bool = true
+## Wall slide (glisser contre un mur en poussant vers lui). Dispo dès le départ.
+## Désactivé : pas de wall slide (ex. : murs glissants, zones).
+@export var can_wall_slide: bool = true
+## Wall-jump (sauter depuis un mur). Verrouillé au départ : se débloque en cours de
+## partie avec unlock_wall_jump(). Coche-le ici pour tester. Le wall slide n'en dépend pas.
+@export var wall_jump_unlocked: bool = false
+## Wall-jump permis en ce moment (ex. : désactivé sur certains murs, zones,
+## cinématiques). Ne sert que si wall_jump_unlocked est vrai.
+@export var can_wall_jump: bool = true
 
 @export_group("Déplacement")
 @export var walk_speed: float = 200.0
@@ -63,6 +73,31 @@ extends CharacterBody2D
 ## Vitesse horizontale ajoutée quand on saute pendant une glissade (saute plus loin).
 @export var slide_jump_boost: float = 50.0
 
+@export_group("Wall jump")
+## Vitesse de chute max au début du wall slide (collé au mur en poussant vers lui).
+@export var wall_slide_speed: float = 120.0
+## Temps (s) sur le mur avant que la glissade commence à accélérer.
+@export var wall_slide_accel_delay: float = 0.3
+## Vitesse de chute max atteinte quand la glissade accélère.
+@export var wall_slide_fast_speed: float = 350.0
+## Durée (s) de la transition de wall_slide_speed vers wall_slide_fast_speed.
+## Courbe en S : démarre doucement, accélère, puis se stabilise en douceur.
+@export var wall_slide_ramp_time: float = 0.5
+## Temps total (s) sur le mur avant de lâcher prise et tomber. Plus de prise ni de
+## wall-jump sur ce mur avant d'avoir touché le sol ou l'autre mur.
+@export var wall_slide_max_time: float = 1.0
+## Poussée horizontale à l'opposé du mur.
+@export var wall_jump_push: float = 320.0
+## Vitesse verticale du wall-jump.
+@export var wall_jump_velocity: float = 420.0
+## Temps (s) pendant lequel la direction est bloquée après un wall-jump
+## (empêche de revenir sur le même mur).
+@export var wall_jump_lock_time: float = 0.2
+## Temps (s) pendant lequel on peut encore wall-jumper après avoir quitté un mur.
+@export var wall_coyote_time: float = 0.08
+## Distance (px) à laquelle un mur est détecté.
+@export var wall_check_distance: float = 2.0
+
 var facing: int = 1
 var is_crouching: bool = false
 var is_sprinting: bool = false
@@ -74,6 +109,14 @@ var air_momentum: float = 0.0
 var _coyote_timer: float = 0.0
 var _jump_buffer_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
+var _wall_coyote_timer: float = 0.0
+## Côté du dernier mur touché : -1 = gauche, 1 = droite.
+var _last_wall_side: int = 0
+## Temps passé à glisser sur le mur actuel (gardé si on lâche puis reprend le même mur).
+var wall_slide_time: float = 0.0
+var _wall_slide_side: int = 0
+## Côté du mur dont on a lâché prise (0 = aucun). Remis à 0 au sol.
+var _tired_wall_side: int = 0
 var _body_shape: RectangleShape2D
 var _standing_height: float
 var _standing_shape_y: float
@@ -122,6 +165,16 @@ func _update_timers(delta: float) -> void:
 	if not is_sliding:
 		_slide_cooldown_timer -= delta
 
+	if is_on_floor():
+		_reset_wall_grip()
+
+	var wall := get_wall_side()
+	if wall != 0:
+		_last_wall_side = wall
+		_wall_coyote_timer = wall_coyote_time
+	else:
+		_wall_coyote_timer -= delta
+
 
 func _on_state_changed(_from: StringName, to: StringName) -> void:
 	if _state_label:
@@ -146,6 +199,27 @@ func wants_crouch() -> bool:
 ## (Vérifié seulement depuis l'état Run.)
 func wants_slide() -> bool:
 	return slide_unlocked and can_slide and is_on_floor() and _slide_cooldown_timer <= 0.0 and Input.is_action_just_pressed("crouch")
+
+
+func can_use_wall_jump() -> bool:
+	return wall_jump_unlocked and can_wall_jump
+
+
+## Vrai si on est dans les airs, en chute, collé à un mur ET qu'on pousse vers lui.
+## Ne dépend pas du wall-jump : on peut wall slider sans pouvoir wall-jumper.
+func wants_wall_slide() -> bool:
+	if not can_wall_slide or velocity.y < 0.0:
+		return false
+	var wall := get_wall_side()
+	return wall != 0 and wall != _tired_wall_side and signf(get_input_direction()) == wall
+
+
+## Vrai si on a appuyé sur saut récemment ET qu'on touche un mur
+## (ou qu'on vient de le quitter : wall_coyote_time), sauf si on a lâché prise sur ce mur.
+func wants_wall_jump() -> bool:
+	if not can_use_wall_jump() or is_on_floor() or _last_wall_side == _tired_wall_side:
+		return false
+	return _jump_buffer_timer > 0.0 and _wall_coyote_timer > 0.0
 
 
 ## Vrai si on a appuyé sur saut récemment ET qu'on peut sauter
@@ -205,6 +279,62 @@ func start_slide() -> void:
 	set_crouching(true)
 
 
+## Côté du mur touché dans les airs : -1 = gauche, 1 = droite, 0 = aucun.
+## Si les deux côtés touchent, celui vers lequel on pousse est prioritaire.
+func get_wall_side() -> int:
+	if is_on_floor():
+		return 0
+	var preferred := int(signf(get_input_direction()))
+	if preferred == 0:
+		preferred = facing
+	for side: int in [preferred, -preferred]:
+		if test_move(global_transform, Vector2(side * wall_check_distance, 0.0)):
+			return side
+	return 0
+
+
+## Appelé en entrant dans WallSlide : le compteur repart à 0 seulement si c'est
+## un autre mur (sinon lâcher puis reprendre le même mur ne remet pas le temps à 0).
+func start_wall_slide() -> void:
+	var wall := get_wall_side()
+	if wall != _wall_slide_side:
+		wall_slide_time = 0.0
+		_wall_slide_side = wall
+	if wall != _tired_wall_side:
+		_tired_wall_side = 0  # Nouveau mur : on retrouve sa prise.
+
+
+## Lâche prise : on tombe, plus de wall slide ni de wall-jump sur ce mur.
+func lose_wall_grip() -> void:
+	_tired_wall_side = _wall_slide_side
+	_wall_coyote_timer = 0.0
+
+
+func _reset_wall_grip() -> void:
+	wall_slide_time = 0.0
+	_wall_slide_side = 0
+	_tired_wall_side = 0
+
+
+## Saut depuis un mur : poussée à l'opposé du dernier mur touché.
+func wall_jump() -> void:
+	set_crouching(false)
+	var away := -_last_wall_side
+	velocity = Vector2(away * wall_jump_push, -wall_jump_velocity)
+	facing = away
+	# L'élan est gardé dans les airs (comme un saut depuis une glissade).
+	air_momentum = wall_jump_push
+	_jump_buffer_timer = 0.0
+	_coyote_timer = 0.0
+	_wall_coyote_timer = 0.0
+	_reset_wall_grip()
+
+
+## Débloque le wall-jump (à appeler depuis un objet, un événement, etc.).
+func unlock_wall_jump() -> void:
+	wall_jump_unlocked = true
+
+
 ## Débloque la glissade (à appeler depuis un objet, un événement, etc.).
 func unlock_slide() -> void:
 	slide_unlocked = true
@@ -241,7 +371,8 @@ func can_stand() -> bool:
 
 ## Placeholder : retourne le visuel selon la direction et l'écrase en crouch.
 ## À remplacer par tes animations plus tard (state_machine.get_current_state_name()
-## donne l'animation à jouer : "Idle", "Walk", "Run", "Jump", "Fall", "Crouch", "Slide").
+## donne l'animation à jouer : "Idle", "Walk", "Run", "Jump", "Fall", "Crouch", "Slide",
+## "WallSlide", "WallJump").
 func _update_visual() -> void:
 	if _visual == null:
 		return

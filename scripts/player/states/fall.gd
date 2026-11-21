@@ -9,6 +9,10 @@ func physics_update(delta: float) -> void:
 	# Coyote time / jump buffer : wants_jump() gère les deux.
 	if player.wants_jump():
 		go(JUMP)
+	elif player.wants_wall_jump():
+		go(WALL_JUMP)
 	elif player.is_on_floor():
 		player.air_momentum = 0.0
 		go(ground_state())
+	elif player.wants_wall_slide():
+		go(WALL_SLIDE)
